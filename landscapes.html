@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link rel="stylesheet" href="css/style.css"/>
+<!-- Load the Paper.js library -->
+<script type="text/javascript" src="js/paper-full.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+jQuery(document).ready(function(){
+var canvas = document.getElementsByTagName('canvas')[0];
+// var maxDiameter = Math.min(905, jQuery('#canvas').parent().width(), jQuery(window).height(), jQuery(window).width());
+
+var maxDiameter = 1240;
+canvas.width  = maxDiameter;
+canvas.height = maxDiameter;
+
+window.globals = {
+    rasterScale: 1 * (maxDiameter/1240)
+};
+});
+</script>
+<!-- Define inlined PaperScript associate it with canvas -->
+<script type="text/paperscript" canvas="canvas">
+
+	var numberOfSectors = 100;
+	var minimumAngle = 0;
+	var currentBaseAngle = 360 * Math.random();
+	var currentRotationAngle = 360 * Math.random();
+	var radius = 2000;
+
+  // currentBaseAngle = 274;
+	// currentRotationAngle = 90;
+	console.log('currentBaseAngle = ' + currentBaseAngle + ';');
+	console.log('currentRotationAngle = ' + currentRotationAngle + ';');
+
+  var angles = getAngles(numberOfSectors);
+
+  var sectors = [];
+
+  function mutateAngles(angles, changeAmount, numberOfChanges) {
+    var totalDecreasingSectors = (angles.length / 2) - 1;
+    for (n = 0; n < numberOfChanges; n++) {
+      selectedSector = getRandomSector();
+      for (i = 0; i < numberOfSectors; i++) {
+        if (i == selectedSector) {
+          angles[i] = angles[i] + changeAmount;
+        } else if (i % 2 == selectedSector % 2) {
+          angles[i] = angles[i] - changeAmount / totalDecreasingSectors;
+        }
+      }
+    }
+    return angles;
+  }
+
+  function getRandomSector() {
+    return Math.floor(Math.random() * numberOfSectors);
+  }
+
+	for (i = 0; i < numberOfSectors; i++) {
+	    var sectorStartAngle = 0;
+    	var sectorEndAngle = 0;
+
+        sectorStartAngle = currentBaseAngle;
+	    if (isClockwise(i)) {
+    	    sectorEndAngle = currentBaseAngle + angles[i];
+    	} else {
+    	    sectorEndAngle = currentBaseAngle - angles[i];
+    	}
+
+    	var sector = createSector(sectorStartAngle, sectorEndAngle, currentRotationAngle, isClockwise(i));
+      sector.position += new Point(0, 600);
+      sectors[i] = sector;
+		  sectors[i].clone();
+		  // sectors[i].clone();
+
+    	currentBaseAngle = sectorEndAngle;
+	    currentRotationAngle += angles[i];
+	}
+
+	drawTopMask();
+
+	// function onFrame(event) {
+	// 		for (i = 0; i < numberOfSectors; i++) {
+	// 			if (isClockwise(i)) {
+	// 	    	    sectors[i].children[1].rotate(0.036, view.center);
+	// 	    	} else {
+	// 	    	    sectors[i].children[1].rotate(-0.036, view.center);
+	// 	    	}
+	// 		}
+	// 	}
+
+	function createSector(startAngle, endAngle, currentRotationAngle, isClockwise) {
+	    var path = drawSectorPath(startAngle, endAngle);
+
+		// var raster = drawRaster();
+    var raster = drawSuperRaster(3, 3);
+
+		var sector = new Group(path, raster);
+		sector.clipped = true;
+		if (endAngle > startAngle) {
+		    sector.rotate(currentRotationAngle - startAngle, view.center);
+		} else {
+		    sector.scale(-1, 1, view.center);
+		    sector.rotate(currentRotationAngle + startAngle, view.center);
+		}
+		// sector.blendMode = 'darken';
+
+		return sector;
+	}
+
+	function drawSectorPath(startAngle, endAngle) {
+	  var path = new Path();
+		var angleChange = endAngle - startAngle;
+		var topPoint = new Point(view.center.x, view.center.y - radius);
+		// if (angleChange > 0) {
+		// 			angleChange += 0.4;
+		// 		} else {
+		// 			angleChange -= 0.4;
+		// 		}
+		path.add(topPoint);
+		path.rotate(angleChange, view.center);
+		var endArc = topPoint;
+		var midArc = topPoint;
+		midArc = midArc.rotate(angleChange/2, view.center);
+		path.arcTo(midArc, endArc);
+		path.rotate(startAngle, view.center);
+		path.add(new Point(view.center));
+		path.closed = true;
+
+		return path;
+	}
+
+	function drawRaster() {
+	  var raster = new Raster('landscape');
+		raster.position = view.center;
+		raster.scale(1, view.center);
+
+		return raster;
+	}
+
+  function drawSuperRaster(rows, columns, rasterWidth) {
+    rasterWidth = typeof rasterWidth !== 'undefined' ? rasterWidth : 1700;
+    var rasterGroup = new Group();
+    for (row = 0; row < rows; row++) {
+
+      for (column = 0; column < columns; column++) {
+
+        // console.log('row: ' + row + '; column: ' + column);
+
+        var raster = new Raster('landscape');
+        // raster.position = view.center;
+        raster.scale(1 - 2 * (column % 2), 1 - 2 * (row % 2), view.center);
+  		  raster.position = new Point(column * rasterWidth - 700, row * rasterWidth - 700);
+
+        rasterGroup.addChild(raster);
+      }
+
+    }
+    rasterGroup.position = view.center;
+    return rasterGroup;
+  }
+
+	function isClockwise(i) {
+	    if (i % 2 == 1) {
+	        return false;
+	    }
+	    return true;
+	}
+
+	function getAngles(numberOfSectors) {
+		// return getFibonacciAngles(numberOfSectors);
+
+	    var angles = [];
+	    var sets = numberOfSectors / 2;
+
+	    var cwAngles = [];
+        var acwAngles = [];
+
+        var cwMultiplier = 0;
+        var acwMultiplier = 0;
+
+		    var totalRandomAngles = 360 - ( numberOfSectors * minimumAngle );
+
+        for (i = 0; i < sets; i++) {
+            // 1 - Math.random() used so never = 0
+            cwAngles[i] = 1 - Math.random();
+            acwAngles[i] = 1 - Math.random();
+
+            cwMultiplier += cwAngles[i];
+            acwMultiplier += acwAngles[i];
+        }
+
+        cwMultiplier = ( totalRandomAngles / 2 ) / cwMultiplier;
+        acwMultiplier = ( totalRandomAngles / 2 ) / acwMultiplier;
+
+        for (i = 0; i < sets; i++) {
+            angles.push( minimumAngle + cwAngles[i] * cwMultiplier );
+            angles.push( minimumAngle + acwAngles[i] * acwMultiplier );
+        }
+
+		return angles;
+	}
+
+  function getUniformAngles(numberOfSectors) {
+		return generateArrayWithDefaultValue(360 / numberOfSectors, numberOfSectors);
+	}
+
+	function getFibonacciAngles(numberOfSectors) {
+		var angles = [];
+		var cwAngles = [];
+        var acwAngles = [];
+
+	    var sets = numberOfSectors / 2;
+
+		var current = 2;
+		var previous = 1;
+
+		var multiplier = 0;
+
+		var totalRandomAngles = 360 - ( numberOfSectors * minimumAngle );
+
+		for (i = 0; i < sets; i++) {
+			if (i > 1) {
+				current += previous;
+				previous = current - previous;
+			}
+
+			cwAngles.push(current);
+			acwAngles.push(current);
+			multiplier += current;
+		}
+
+		multiplier = ( totalRandomAngles / 2 ) / multiplier;
+
+		cwAngles = shuffle(cwAngles);
+		acwAngles = shuffle(acwAngles);
+
+		for (i = 0; i < sets; i++) {
+			angles.push( minimumAngle + cwAngles[i] * multiplier );
+            angles.push( minimumAngle + acwAngles[i] * multiplier );
+		}
+
+		return angles;
+	}
+
+	function getParametricAngles(numberOfSectors) {
+		// return getFibonacciAngles(numberOfSectors);
+
+	    var angles = [];
+	    var sets = numberOfSectors / 2;
+
+	    var cwAngles = [];
+        var acwAngles = [];
+
+        var cwMultiplier = 0;
+        var acwMultiplier = 0;
+
+		var totalRandomAngles = 360 - ( numberOfSectors * minimumAngle );
+
+        for (i = 0; i < sets; i++) {
+            // 1 - Math.random() used so never = 0
+            cwAngles[i] = 5.0 + 5 * Math.cos((2 * i) * (360 / numberOfSectors) * Math.PI / 180.0);
+            acwAngles[i] = 5.0 + 5 * Math.cos((2 * i + 1) * (360 / numberOfSectors) * Math.PI / 180.0);
+
+            cwMultiplier += cwAngles[i];
+            acwMultiplier += acwAngles[i];
+        }
+
+        cwMultiplier = ( totalRandomAngles / 2 ) / cwMultiplier;
+        acwMultiplier = ( totalRandomAngles / 2 ) / acwMultiplier;
+
+        for (i = 0; i < sets; i++) {
+            angles.push( minimumAngle + cwAngles[i] * cwMultiplier );
+            angles.push( minimumAngle + acwAngles[i] * acwMultiplier );
+        }
+
+		return angles;
+	}
+
+	function drawTopMask() {
+		// Separate mask layer used rather than clipping due to alias issue in Chrome
+		var rectangle = new Rectangle(new Point(0, 0), new Point(view.size.width, view.size.height));
+		var path = new Path.Rectangle(rectangle);
+		var square = new Path.Rectangle(new Point(20, 20), new Point(view.size.width - 20, view.size.height - 20));
+		var circle = new Path.Circle(view.center, (view.size.height/2)-10);
+		path.fillColor = 'white';
+		path.opacity = 0;
+		path.exclude(square);
+	}
+
+	function shuffle(array) {
+	  var currentIndex = array.length, temporaryValue, randomIndex;
+
+	  // While there remain elements to shuffle...
+	  while (0 !== currentIndex) {
+
+	    // Pick a remaining element...
+	    randomIndex = Math.floor(Math.random() * currentIndex);
+	    currentIndex -= 1;
+
+	    // And swap it with the current element.
+	    temporaryValue = array[currentIndex];
+	    array[currentIndex] = array[randomIndex];
+	    array[randomIndex] = temporaryValue;
+	  }
+
+	  return array;
+	}
+
+  function generateArrayWithDefaultValue(defaultValue, arrayLength) {
+		return Array.apply(null, Array(arrayLength)).map(function() { return defaultValue });
+	}
+</script>
+</head>
+<body>
+    <img id="landscape" src="images/colwick-country-park.jpg" style="display: none;">
+    <canvas id="canvas" style="height: 1240px; width: 1240px;"></canvas>
+</body>
+</html>

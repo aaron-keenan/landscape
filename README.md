@@ -6,4 +6,4 @@ Sliced landscapes made with Paper.js
 
 * Generates images based on a source photo
 
-* Load landscapes.html in browser and refresh to regenerate
+* Load landscapes.html in a browser and refresh to regenerate
